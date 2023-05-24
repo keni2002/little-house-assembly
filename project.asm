@@ -1,5 +1,3 @@
-
-
 format binary as 'img'
 
 org 07c00h
@@ -7,9 +5,17 @@ org 07c00h
 mov ax,0x13
 int 10h
 
-mov ax,0xA000
-mov es,ax
-mov di,320*155+110
+CLI
+XOR AX,AX
+MOV GS,AX
+MOV AX,key
+MOV [GS:9*4],AX
+MOV [GS:9*4+2],CS
+MOV AX,timer
+MOV [GS:8*4],AX
+MOV [GS:8*4+2],CS
+STI
+mov edi,0xa0000+320*155+110
 
 
 mov [color], 53 ;celeste
@@ -21,23 +27,6 @@ mov [color],42 ;naranja
 mov [largo],25
 add di,50 ;offset right to put el techo derecho
 call triangulo
-;-----------------------bombilllo
-
-mov [color],116 ;amarillo opaco
-
-mov [largo],3
-add di, 320*(25+10) ;return al alero y me offset 10 abajo
-call triangulo
-mov [ancho],(2*3+2*3) ;6
-mov [largo],6
-add di,320*9-6 ; pabajo 3 luego 6 para darle espacio al rectangulo
-call cuadrado
-inc [mirror]
-add di,320*7+6
-mov [largo],3
-call triangulo
-
-;----------------------------fin bombillo
 
 mov di,320*155+160-15 ;button left corner door home
 
@@ -48,33 +37,89 @@ mov [largo],50
 call cuadrado
 
 
-add di,320*12-30
+add di,320*12-30 ;caminate a la mitad izquierda de la puerta 
 
 mov [ancho],25
 mov [largo],25
 call cuadrado
-
 ;----------------------------segunda ventana
 add di,320*25+(25+5+30+5)
 call cuadrado
 
+
 ;Perilla
 mov di,320*155+160+10 ;button almost right corner door home FOR PERILLA
 sub di,320*24
-mov [es:di],word 0f0fh
+mov [edi],word 0f0fh
 add di,320
-mov [es:di],word 0f0fh
-
-
-
-
+mov [edi],word 0f0fh
 
 
 
 jmp $
-;-----------------------------------------------------------SUBRUTINE
+;-----------------------------------------------------------SUBRUTINES
 
+ timer:dec [cont]
+	 jnz salir
+	 
+	call Print
+	 mov  [cont],4
+	 salir:mov	al,20h			; fin de interrupcion hardware
+		out	20h,al			; al pic maestro
+	iret
+	key:
+		in al, 60h
+		cmp al, 127
+		ja fin_key
+		cmp al, 30 ;scan de a
+			jnz o1
+			mov [flag],2
+		jmp fin_key
 
+		o1:cmp al,18 ;scan e
+		   jnz o2
+		   mov [flag], 3
+		   jmp fin_key
+		o2:cmp al,25
+			jnz fin_key
+			mov [flag],0
+		fin_key: mov al,20h
+				out 20h,al
+			iret
+
+;---------------------------------------------
+
+Print:
+    cmp [flag],0
+    je opaco
+    cmp [flag],2
+    je opaco
+    mov [color],44  ;brillante
+    jmp normal
+    opaco:
+    mov [color],116
+    normal: 
+    mov edi, 0xa0000+25710+50 ;seria en la parte izq del cuadrado azul a 75 de altura para luego moverme a la derecha 50
+    
+    mov [largo],3
+    call triangulo
+    mov [ancho],(13) ;6
+    mov [largo],6
+    add di,320*9-6 ; pabajo 3 luego 6 para darle espacio al rectangulo
+    call cuadrado
+    
+    add di,320*7+6
+    mov [largo],3
+    inc [mirror]
+    call triangulo
+    cmp [flag],3
+    je fin
+    cmp [flag],2
+    je fin
+    xor [flag],1
+    
+fin:dec [mirror]
+ret
 
 cuadrado:
     mov bl, [largo]
@@ -85,7 +130,7 @@ cuadrado:
         mov bl, [ancho]
         mov cx, bx
         segundo_bucle:
-            mov [es:di], byte al
+            mov [edi], byte al
             inc di
         loop segundo_bucle
         
@@ -110,7 +155,7 @@ triangulo:
         push cx
         mov cx,bx
         triang2:
-            mov [es:di], byte al
+            mov [edi], byte al
             dec di
         loop triang2
         
@@ -151,7 +196,7 @@ triangulo:
         push cx
         mov cx,bx
         triang4:
-            mov [es:di], byte al
+            mov [edi], byte al
             inc di    ;----CHANGE
         loop triang4
         
@@ -178,8 +223,8 @@ ancho db 0
 largo db 0
 color db 1001b
 mirror db 0
-cont db 0
-flag db 0
+cont db 1
+flag db 2
 
 times 510-($-$$) db 0
 dw 0xaa55
